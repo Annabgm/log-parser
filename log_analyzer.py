@@ -166,7 +166,8 @@ def main():
         if files_list_ui:
             target_file, target_date = last_log_finder(files_list_ui)
             logging.info('Last log file name is {}'.format(target_file))
-            report_file = 'report-{}.html'.format(target_date.replace('-', '.'))
+            report_date = datetime.datetime.strptime(target_date, '%Y%m%d').strftime('%Y.%m.%d')
+            report_file = 'report-{}.html'.format(report_date)
             if report_file not in os.listdir(report_dir):
                 lines, f = get_open(os.path.join(log_dir, target_file))
                 url_data = parse_file(lines)
@@ -179,6 +180,8 @@ def main():
                     save_html(res, os.path.join(report_dir, report_file))
                 else:
                     logging.info('Parsing error exceed critical level 80%')
+            else:
+                logging.info('{0} file already in {1} directory'.format(report_file, report_dir))
         else:
             logging.info('No log files in {} directory'.format(log_dir))
     except Exception as exception:
