@@ -82,9 +82,9 @@ def last_log_finder(files_list):
 
 def get_data_from_log(name):
     """
-    function read file and define generator for following line parcing
+    function read file and parcing to indivudual events what matches pattern
     :param name: str
-    :return: itarable
+    :return: dict[str, list(float)]
     """
     if name.endswith('.gz'):
         fin = gzip.open(name, 'rb')
