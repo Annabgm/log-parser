@@ -15,21 +15,21 @@ config = {
 class LogParserTest(unittest.TestCase):
 
     def test_conf_params_fail(self):
-        self.assertRaises(FileNotFoundError, define_conf_params, './source/default.json')
+        self.assertRaises(FileNotFoundError, define_conf_params, './config/default.json')
 
     def test_conf_params_fail2(self):
         try:
-            define_conf_params('./source/config_u2.yaml')
+            define_conf_params('./config/config_u2.yaml')
         except :
             pass
         else:
             self.fail('Fail to recognize wrong config file format')
 
     def test_conf_params_collision(self):
-        size, report_dir, log_dir = define_conf_params('./source/config_u1.json')
-        self.assertEqual(size, 1000)
-        self.assertEqual(report_dir, './reports')
-        self.assertEqual(log_dir, '.')
+        config = define_conf_params('./config/config_u1.json')
+        self.assertEqual(config['REPORT_SIZE'], 1000)
+        self.assertEqual(config['REPORT_DIR'], './reports')
+        self.assertEqual(config['LOG_DIR'], '.')
 
     def test_last_log_finder(self):
         ls = ['nginx-access-ui.log-20170630.gz',
