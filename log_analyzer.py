@@ -49,11 +49,8 @@ def define_conf_params(user_conf):
     except:
         print('Config file {} cannot be parsed'.format(user_conf))
         raise
-    config_fin = dict()
-    config_fin['REPORT_SIZE'] = config_user.get('REPORT_SIZE', config['REPORT_SIZE'])
-    config_fin['REPORT_DIR'] = config_user.get('REPORT_DIR', config['REPORT_DIR'])
-    config_fin['LOG_DIR'] = config_user.get('LOG_DIR', config['LOG_DIR'])
-    return config_fin
+    config.update(config_user)
+    return config
 
 
 def log_finder(log_dir):
@@ -64,23 +61,12 @@ def log_finder(log_dir):
     logname = r'nginx-access-ui\.log-\d{8}[.]?[g]?[z]?'
     lognames = re.compile(logname)
     files_list_ui = [i for i in os.listdir(log_dir) if lognames.fullmatch(i)]
-    if files_list_ui:
-        return last_log_finder(files_list_ui)
-    else:
-        return None
-
-
-def last_log_finder(files_list):
-    """
-    function search in files to find the latest log
-    :return: tuple[str, str]
-    """
-    files_tuple_ui = [(i, i.split('-')[-1].split('.')[0]) for i in files_list]
+    files_tuple_ui = [(i, i.split('-')[-1].split('.')[0]) for i in files_list_ui]
     files_tuple_ui.sort(key=lambda x: datetime.datetime.strptime(x[1], '%Y%m%d'))
     return files_tuple_ui[-1]
 
 
-def get_data_from_log(name):
+def parse_file(name):
     """
     function read file and parcing to indivudual events what matches pattern
     :param name: str
@@ -91,21 +77,11 @@ def get_data_from_log(name):
     else:
         fin = open(name, 'rb')
     log_gen = (row.decode('utf-8') for row in fin)
-    url_data = parse_file(log_gen)
-    fin.close()
-    return url_data
 
-
-def parse_file(lines):
-    """
-    from lines generate dict with keys - url and values - all find request times for the url
-    :param lines: generator
-    :return: dict[str, list[float]]
-    """
     logpats = r"""(\S+) (\S+)  (\S+) (\S+) (\S+) "(\S+) (\S+) (\S+)" (\S+) (\S+) "(\S+)" "(\S+).*?" "(\S+)" "(\S+)" "(\S+)" (\S+)"""
     logpat = re.compile(logpats)
 
-    groups = (logpat.match(line) for line in lines)
+    groups = (logpat.match(line) for line in log_gen)
     url_dict = defaultdict(list)
     count = 0
     er_count = 0
@@ -116,12 +92,12 @@ def parse_file(lines):
         else:
             row = g.groups()
             url_dict[row[6]].append(float(row[-1]))
+    fin.close()
     fail_percent = er_count/count
     logging.info('Percent rate of parsing failure is {}'.format(fail_percent))
     if fail_percent > 0.8:
-        return None
-    else:
-        return url_dict
+        raise Exception('Percent rate of parsing failure is {}'.format(fail_percent))
+    return url_dict
 
 
 def calculate_stats(parse_dict):
@@ -159,47 +135,45 @@ def save_html(res, new_name):
         f.write(templ)
 
 
-parser = argparse.ArgumentParser('Logs parser')
-parser.add_argument('--config', default='default.json', help='file to read the config from')
+def main(arg):
+    config_file = define_conf_params(arg.config)
+    logging.info('Config parameters: '.format(config_file))
+    target_file = None
+    try:
+        target_file = log_finder(config_file['LOG_DIR'])
+    except:
+        logging.info('No log files in {} directory'.format(config_file['LOG_DIR']))
+        pass
+
+    if target_file is not None:
+        logging.info('Last log file name is {}'.format(target_file[0]))
+        report_date = datetime.datetime.strptime(target_file[1], '%Y%m%d').strftime('%Y.%m.%d')
+        report_file = 'report-{}.html'.format(report_date)
+        if not os.path.exists(os.path.join(config_file['REPORT_DIR'], report_file)):
+            try:
+                url_data = parse_file(os.path.join(config_file['LOG_DIR'], target_file[0]))
+                report_data = calculate_stats(url_data)
+                report_data = sorted(report_data, key=attrgetter('time_sum'), reverse=True)
+                res = [dict(i._asdict()) for i in report_data[:config_file['REPORT_SIZE']]]
+                logging.info('Report is in {} file'.format(report_file))
+                save_html(res, os.path.join(config_file['REPORT_DIR'], report_file))
+            except Exception as e:
+                logging.info('Parsing error {}'.format(e))
+        else:
+            logging.info('{0} file already in {1} directory'.format(report_file, config_file['REPORT_DIR']))
 
 
-def main():
-    config_file = define_conf_params(parser.parse_args().config)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser('Logs parser')
+    parser.add_argument('--config', default='default.json', help='file to read the config from')
+    arg = parser.parse_args()
     logging.basicConfig(
-        filename=os.path.join(config_file['LOG_DIR'], 'log_parser.log') or None,
+        filename=os.path.join(config['LOG_DIR'], 'log_parser.log') or None,
         level=logging.INFO,
         datefmt='%Y.%m.%d %H:%M:%S',
         format='[%(asctime)s] %(levelname).1s %(message)s',
         filemode='w')
-    logging.info('Config parameters: report_size={0}, report_dir={1}, log_dir={2}'.format(
-                                                                                            config_file['REPORT_SIZE'],
-                                                                                            config_file['REPORT_DIR'],
-                                                                                            config_file['LOG_DIR']
-                                                                                        ))
-
     try:
-        target_file = log_finder(config_file['LOG_DIR'])
-        if target_file is not None:
-            logging.info('Last log file name is {}'.format(target_file[0]))
-            report_date = datetime.datetime.strptime(target_file[1], '%Y%m%d').strftime('%Y.%m.%d')
-            report_file = 'report-{}.html'.format(report_date)
-            if not os.path.exists(os.path.join(config_file['REPORT_DIR'], report_file)):
-                url_data = get_data_from_log(os.path.join(config_file['LOG_DIR'], target_file[0]))
-                if url_data is not None:
-                    report_data = calculate_stats(url_data)
-                    report_data = sorted(report_data, key=attrgetter('time_sum'), reverse=True)
-                    res = [dict(i._asdict()) for i in report_data[:config_file['REPORT_SIZE']]]
-                    logging.info('Report is in {} file'.format(report_file))
-                    save_html(res, os.path.join(config_file['REPORT_DIR'], report_file))
-                else:
-                    logging.info('Parsing error exceed critical level 80%')
-            else:
-                logging.info('{0} file already in {1} directory'.format(report_file, config_file['REPORT_DIR']))
-        else:
-            logging.info('No log files in {} directory'.format(config_file['LOG_DIR']))
+        main(arg)
     except Exception as exception:
-        logging.exception(exception)
-
-
-if __name__ == "__main__":
-    main()
+        logging.exception("Unexpected error: {}".format(exception))
