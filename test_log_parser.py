@@ -1,8 +1,6 @@
 import unittest
 from log_analyzer import (
 define_conf_params,
-last_log_finder,
-parse_file,
 calculate_stats
 )
 
@@ -30,29 +28,6 @@ class LogParserTest(unittest.TestCase):
         self.assertEqual(config['REPORT_SIZE'], 1000)
         self.assertEqual(config['REPORT_DIR'], './reports')
         self.assertEqual(config['LOG_DIR'], '.')
-
-    def test_last_log_finder(self):
-        ls = ['nginx-access-ui.log-20170630.gz',
-              'nginx-access-ui.log-20170730.bz',
-              'nginx-access-ui.log-20170830']
-        last_log1, last_log2 = last_log_finder(ls)
-        self.assertEqual(last_log1, 'nginx-access-ui.log-20170830')
-        self.assertEqual(last_log2, '20170830')
-
-    def test_parse_file(self):
-        ls = ['1.99.174.176 3b81f63526fa8  - [29/Jun/2017:03:50:22 +0300] "GET /api/1/?server_name=WIN7RB4 HTTP/1.1" 200 12 "-" "Python-urllib/2.7" "-" "1498697422-32900793-4708-9752770" "-" 0.133',
-              '1.169.137.128 -  - [29/Jun/2017:03:50:22 +0300] "GET /api/v2/banner/16852664 HTTP/1.1" 200 19415 "-" "Slotovod" "-" "1498697422-2118016444-4708-9752769" "712e90144abee9" 0.199']
-        lines = (i for i in ls)
-        result_dict = parse_file(lines)
-        self.assertEqual(result_dict, {'/api/1/?server_name=WIN7RB4': [0.133],
-                                           '/api/v2/banner/16852664': [0.199]})
-
-    def test_parse_file_fail(self):
-        ls = ['[29/Jun/2017:03:50:22 +0300] 0.133',
-              '[29/Jun/2017:03:50:22 +0300] 0.199']
-        lines = (i for i in ls)
-        result_dict = parse_file(lines)
-        self.assertIsNone(result_dict)
 
     def test_calculate_stats(self):
         log_dict = {'/api/1/?server_name=WIN7RB4': [0.1, 0.2, 0.3],

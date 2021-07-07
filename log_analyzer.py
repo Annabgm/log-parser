@@ -48,7 +48,7 @@ def define_conf_params(user_conf):
             config_user = json.load(f)
     except:
         print('Config file {} cannot be parsed'.format(user_conf))
-        raise
+        raise FileNotFoundError('Config file {} cannot be parsed'.format(user_conf))
     config.update(config_user)
     return config
 
@@ -137,7 +137,7 @@ def save_html(res, new_name):
 
 def main(arg):
     config_file = define_conf_params(arg.config)
-    logging.info('Config parameters: '.format(config_file))
+    logging.info('Config parameters: ' + ', '.join('{}\t{}'.format(k, v) for k, v in config_file.items()))
     target_file = None
     try:
         target_file = log_finder(config_file['LOG_DIR'])
