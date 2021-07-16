@@ -1,30 +1,29 @@
 import unittest
+import copy
+
 from log_analyzer import (
 define_conf_params,
-calculate_stats
+calculate_stats,
+config
 )
 
-config = {
-    "REPORT_SIZE": 2,
-    "REPORT_DIR": ".",
-    "LOG_DIR": "."
-}
+config_file = copy.deepcopy(config)
 
 class LogParserTest(unittest.TestCase):
 
     def test_conf_params_fail(self):
-        self.assertRaises(FileNotFoundError, define_conf_params, './config/default.json')
+        self.assertRaises(Exception, define_conf_params, './config/default.json')
 
     def test_conf_params_fail2(self):
         try:
-            define_conf_params('./config/config_u2.yaml')
+            define_conf_params(config_file, './config/config_u2.yaml')
         except :
             pass
         else:
             self.fail('Fail to recognize wrong config file format')
 
     def test_conf_params_collision(self):
-        config = define_conf_params('./config/config_u1.json')
+        config = define_conf_params(config_file, './config/config_u1.json')
         self.assertEqual(config['REPORT_SIZE'], 1000)
         self.assertEqual(config['REPORT_DIR'], './reports')
         self.assertEqual(config['LOG_DIR'], '.')

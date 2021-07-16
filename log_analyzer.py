@@ -13,6 +13,7 @@ import json
 import logging
 import re
 import copy
+import shutil
 
 
 # log_format ui_short '$remote_addr  $remote_user $http_x_real_ip [$time_local] "$request" '
@@ -40,9 +41,10 @@ Stats = namedtuple('Stats', [
 
 def define_conf_params(default_config, user_conf):
     """
-    function read config file and cobain default and new parameter
-    :param user_conf:
-    :return: dict(str, union(str, int))
+    function read config file and combain default and new parameter
+    :param default_config: dict[str, union[str, int]]
+    :param user_conf: str
+    :return: dict[str, union[str, int]]
     """
     try:
         with open(user_conf, 'r') as f:
@@ -131,17 +133,22 @@ def calculate_stats(parse_dict):
     return report
 
 
-def save_html(res, new_name):
+def save_html(res, dest_dir, file_name):
     """
     function replace default name in html-template by json table and write in file new_name
     :param res: list[Stats]
-    :param new_name: str
+    :param dest_dir: str
+    :param file_name: str
     :return:
     """
     with open('report.html', 'r', encoding='utf-8') as tmp:
         templ = Template(tmp.read()).safe_substitute(table_json=res)
-    with open(new_name, 'w') as f:
+    tmp_dest = './tmp'
+    if not os.path.isdir(tmp_dest):
+        os.makedirs('./tmp')
+    with open(os.path.join(tmp_dest, file_name), 'w') as f:
         f.write(templ)
+    shutil.move(os.path.join(tmp_dest, file_name), os.path.join(dest_dir, file_name))
 
 
 def main(arg):
@@ -155,7 +162,7 @@ def main(arg):
         filemode='w')
     logging.info('Config parameters: ' + ', '.join('{}\t{}'.format(k, v) for k, v in config_file.items()))
     target_file = log_finder(config_file['LOG_DIR'])
-    if target_file is None:
+    if target_file[0] is None:
         logging.info('No log files in {} directory'.format(config_file['LOG_DIR']))
         return
     logging.info('Last log file name is {}'.format(target_file[0]))
@@ -170,7 +177,7 @@ def main(arg):
         report_data = sorted(report_data, key=attrgetter('time_sum'), reverse=True)
         res = [dict(i._asdict()) for i in report_data[:config_file['REPORT_SIZE']]]
         logging.info('Report is in {} file'.format(report_file))
-        save_html(res, os.path.join(config_file['REPORT_DIR'], report_file))
+        save_html(res, config_file['REPORT_DIR'], report_file)
         return
     except Exception as e:
         logging.info('Parsing error {}'.format(e))
